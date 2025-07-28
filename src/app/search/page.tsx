@@ -4,6 +4,7 @@
 import { ChevronUp, Search, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Converter } from 'opencc-js'; // 引入 opencc-js 用於繁簡轉換
 
 import {
   addSearchHistory,
@@ -29,6 +30,9 @@ function SearchPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+
+  // 初始化 opencc-js 轉換器（繁體到簡體）
+  const converter = useMemo(() => new Converter({ from: 'tw', to: 'cn' }), []);
 
   // 獲取默認聚合設置：只讀取用戶本地設置，默認為 true
   const getDefaultAggregate = () => {
@@ -202,8 +206,11 @@ function SearchPageClient() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = searchQuery.trim().replace(/\s+/g, ' ');
+    let trimmed = searchQuery.trim().replace(/\s+/g, ' ');
     if (!trimmed) return;
+
+    // 將繁體中文轉為簡體中文（英文和簡體中文保持不變）
+    trimmed = converter(trimmed);
 
     // 回顯搜索框
     setSearchQuery(trimmed);
