@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 
 export const runtime = 'edge';
 
-// 读取存储类型环境变量，默认 localstorage
+// 讀取存儲類型環境變量，默認 localstorage
 const STORAGE_TYPE =
   (process.env.NEXT_PUBLIC_STORAGE_TYPE as
     | 'localstorage'
@@ -15,7 +15,7 @@ const STORAGE_TYPE =
     | 'upstash'
     | undefined) || 'localstorage';
 
-// 生成签名
+// 生成簽名
 async function generateSignature(
   data: string,
   secret: string
@@ -24,7 +24,7 @@ async function generateSignature(
   const keyData = encoder.encode(secret);
   const messageData = encoder.encode(data);
 
-  // 导入密钥
+  // 導入密鑰
   const key = await crypto.subtle.importKey(
     'raw',
     keyData,
@@ -33,16 +33,16 @@ async function generateSignature(
     ['sign']
   );
 
-  // 生成签名
+  // 生成簽名
   const signature = await crypto.subtle.sign('HMAC', key, messageData);
 
-  // 转换为十六进制字符串
+  // 轉換為十六進制字符串
   return Array.from(new Uint8Array(signature))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
-// 生成认证Cookie（带签名）
+// 生成認證Cookie（帶簽名）
 async function generateAuthCookie(username: string): Promise<string> {
   const authData: any = {
     role: 'user',
@@ -50,7 +50,7 @@ async function generateAuthCookie(username: string): Promise<string> {
     timestamp: Date.now(),
   };
 
-  // 使用process.env.PASSWORD作为签名密钥，而不是用户密码
+  // 使用process.env.PASSWORD作為簽名密鑰，而不是用戶密碼
   const signingKey = process.env.PASSWORD || '';
   const signature = await generateSignature(username, signingKey);
   authData.signature = signature;
@@ -60,71 +60,71 @@ async function generateAuthCookie(username: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    // localstorage 模式下不支持注册
+    // localstorage 模式下不支持注冊
     if (STORAGE_TYPE === 'localstorage') {
       return NextResponse.json(
-        { error: '当前模式不支持注册' },
+        { error: '當前模式不支持注冊' },
         { status: 400 }
       );
     }
 
     const config = await getConfig();
-    // 校验是否开放注册
+    // 校驗是否開放注冊
     if (!config.UserConfig.AllowRegister) {
-      return NextResponse.json({ error: '当前未开放注册' }, { status: 400 });
+      return NextResponse.json({ error: '當前未開放注冊' }, { status: 400 });
     }
 
     const { username, password } = await req.json();
 
     if (!username || typeof username !== 'string') {
-      return NextResponse.json({ error: '用户名不能为空' }, { status: 400 });
+      return NextResponse.json({ error: '用戶名不能為空' }, { status: 400 });
     }
     if (!password || typeof password !== 'string') {
-      return NextResponse.json({ error: '密码不能为空' }, { status: 400 });
+      return NextResponse.json({ error: '密碼不能為空' }, { status: 400 });
     }
 
-    // 检查是否和管理员重复
+    // 檢查是否和管理員重覆
     if (username === process.env.USERNAME) {
-      return NextResponse.json({ error: '用户已存在' }, { status: 400 });
+      return NextResponse.json({ error: '用戶已存在' }, { status: 400 });
     }
 
     try {
-      // 检查用户是否已存在
+      // 檢查用戶是否已存在
       const exist = await db.checkUserExist(username);
       if (exist) {
-        return NextResponse.json({ error: '用户已存在' }, { status: 400 });
+        return NextResponse.json({ error: '用戶已存在' }, { status: 400 });
       }
 
       await db.registerUser(username, password);
 
-      // 添加到配置中并保存
+      // 添加到配置中並保存
       config.UserConfig.Users.push({
         username,
         role: 'user',
       });
       await db.saveAdminConfig(config);
 
-      // 注册成功，设置认证cookie
+      // 注冊成功，設置認證cookie
       const response = NextResponse.json({ ok: true });
       const cookieValue = await generateAuthCookie(username);
       const expires = new Date();
-      expires.setDate(expires.getDate() + 7); // 7天过期
+      expires.setDate(expires.getDate() + 7); // 7天過期
 
       response.cookies.set('auth', cookieValue, {
         path: '/',
         expires,
-        sameSite: 'lax', // 改为 lax 以支持 PWA
-        httpOnly: false, // PWA 需要客户端可访问
-        secure: false, // 根据协议自动设置
+        sameSite: 'lax', // 改為 lax 以支持 PWA
+        httpOnly: false, // PWA 需要客戶端可訪問
+        secure: false, // 根據協議自動設置
       });
 
       return response;
     } catch (err) {
-      console.error('数据库注册失败', err);
-      return NextResponse.json({ error: '数据库错误' }, { status: 500 });
+      console.error('數據庫注冊失敗', err);
+      return NextResponse.json({ error: '數據庫錯誤' }, { status: 500 });
     }
   } catch (error) {
-    console.error('注册接口异常', error);
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 });
+    console.error('注冊接口異常', error);
+    return NextResponse.json({ error: '服務器錯誤' }, { status: 500 });
   }
 }
